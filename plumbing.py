@@ -40,15 +40,80 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
 
         hash = objects[0]
 
+        def check_object_type(hash: str) -> tuple(str, str):
+            with open(f"{BASE_PATH}/objects/{hash[:2]}/{hash[2:]}", "rb") as f:
+                file = f.read()
+
+            decompressed = zlib.decompress(file)
+            file_type = decompressed[0:6].decode("utf-8")
+
+            return file_type, decompressed
+
+        def is_tree(bytes: str) -> str:
+            lines = []
+    
+            for i in range(1, len(bytes), 2):
+                type = repr((bytes[i - 1])[-6:])[2:-1]
+    
+                if (i + 2) != len(bytes):
+                    hash_sha = (bytes[i + 1])[1:-6]
+                else:
+                    hash_sha = (bytes[i + 1])[1:]
+                hash = hash_sha.hex()
+
+                name = repr(bytes[i])[2:-1]
+
+                if type == "040000":
+                    t = "tree"
+                elif type == "160000":
+                    t = "commit"
+                else:
+                    t = "blob"
+
+                lines.append(f"{type} {t} {hash}    {name}")
+    
+            return "\n".join(lines)
+
+        def is_blob(decompressed) -> str:
+            #with open(f"{BASE_PATH}/objects/{hash[:2]}/{hash[2:]}", "rb") as f:
+            #    file = f.read()
+
+            final = decompressed.decode("utf-8").split("\x00")
+            return final
+
         if e:
+            # Implement logic to check if its blob, commit, tree or tag. look at that header, automatically figure out the content type, strip the metadata, and cleanly output just the original contents.
             pass
 
         elif p:
             # Implement logic to check if its blob, commit, tree or tag. look at that header, automatically figure out the content type, strip the metadata, and cleanly output just the original contents.
-            with open(f"{BASE_PATH}/objects/{hash[:2]}/{hash[2:]}", "rb") as f:
-                file = f.read()
-            return zlib.decompress(file)
-        
+            file_type, content = check_object_type(hash)
+            #file_object = is_blob(hash)[1].replace("\n", "")
+
+            if file_type[0:4] == "blob":
+                file_content = is_blob(content)[1].replace("\n", "")
+            elif file_type[0:4] == "tree":
+                content = content.replace(b"\x00", b" 0").split(b" ")
+                file_content = is_tree(content[2:])
+            else:
+                Pass # Implement this logic.
+
+            return file_content
+
+        elif t:
+            # Implement logic to check if its blob, commit, tree or tag. look at that header, automatically figure out the content type, strip the metadata, and cleanly output just the original contents.
+            file_type, content = check_object_type(hash)
+            #file_type = is_blob(hash)[0].split(" ")[0]
+
+            if file_type[0:4] == "blob":
+                file_content = is_blob(content)[0].split(" ")[0]
+            elif file_type[0:4] == "tree":
+                file_content = is_tree(content[2:])
+            else:
+                Pass # Implement this logic.
+
+            return file_content
+
     elif batch or batch_check or batch_command:
         if len(objects) > 0:
             parser.error("Batch modes do not take positional arguments.")

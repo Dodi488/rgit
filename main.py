@@ -51,7 +51,7 @@ def prepare_hash_object(*args) -> tuple[SyntaxStatus, str]:
     final = plumbing.hash_object(**vars(parsed_args))
     return SyntaxStatus.SYNTAX_CORRECT, final
 
-def prepare_cat_file(*args) -> tuple[SyntaxStatus, str]:
+def prepare_cat_file(*args) -> SyntaxStatus:
     # Define flags
     parser = argparse.ArgumentParser(prog="cat_file")
 
@@ -100,7 +100,7 @@ def prepare_cat_file(*args) -> tuple[SyntaxStatus, str]:
     #)
 
     print(final)
-    return SyntaxStatus.SYNTAX_CORRECT, final
+    return SyntaxStatus.SYNTAX_CORRECT
 
 def main():
     if len(sys.argv) < 2:
