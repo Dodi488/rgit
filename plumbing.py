@@ -49,7 +49,7 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
 
             return file_type, decompressed
 
-        def is_tree(bytes: list[bytes]) -> str:
+        def is_tree(bytes: bytes) -> str:
             header_end = bytes.find(b"\x00")
             content = bytes[header_end + 1:]
             lines = []
@@ -59,11 +59,11 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
                 type = content[:space].decode("utf-8")
 
                 nullo = content.find(b"\x00", space)
-                name = content[space, + 1:nullo].decode("utf-8")
+                name = content[space + 1:nullo].decode("utf-8")
 
-                sha = content[nullo + 1:nullo + 21]
+                hash = content[nullo + 1:nullo + 21]
 
-                type = mode.zfill(6)
+                type = type.zfill(6)
 
                 if type == "040000":
                     t = "tree"
@@ -72,29 +72,9 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
                 else:
                     t = "blob"
 
-            # for i in range(1, len(bytes)):
-            #    line = bytes[i]
-            #    last_line = bytes[i - 1]
+                lines.append(f"{type} {t} {hash.hex()}    {name}")
 
-            #    type = repr(last_line[-6:].replace(b"\x00", b"0"))[2:-1]
-    
-            #    if (i + 1) != len(bytes):
-            #        name = repr(line[:-27])[2:-1]
-            #        hash = line[-26:-6].hex()
-            #    else:
-            #        name = repr(line[:-20])[2:-1]
-            #        hash = line[-26:].hex()
-
-            #    if type == "040000":
-            #        t = "tree"
-            #    elif type == "160000":
-            #        t = "commit"
-            #    else:
-            #        t = "blob"
-
-                lines.append(f"{type} {t} {hash}    {name}")
-
-                content = content[nullo + 21]
+                content = content[nullo + 21:]
     
             return "\n".join(lines)
 
@@ -144,7 +124,7 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
                 file_content = is_blob(content)[1].replace("\n", "")
             elif file_type[0:4] == "tree":
                 #content = content.replace(b"\x00", b" 0").split(b" ")
-                content = content[2:-1].split(b" ")[1:]
+                #content = content[2:-1].split(b" ")[1:]
                 file_content = is_tree(content)
             elif file_type == "commit":
                 file_content = is_commit(hash)
