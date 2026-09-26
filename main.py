@@ -6,6 +6,7 @@ from typing import Tuple
 
 sys.dont_write_bytecode = True
 BASE_PATH = ".rgit"
+BRANCH_NAME = "main"
 
 class ExecuteResult(Enum):
     EXECUTE_SUCCESS = 0
