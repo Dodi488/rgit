@@ -20,6 +20,26 @@ class PrepareArgs(Enum):
     SUCCESS = 0
     FAIL = 1
 
+# Helper functions
+def parse_flags(name: str, flags: list, args: tuple):
+    # Defina the name.
+    parser = argparse.ArgumentParser(prog=name)
+
+    # Define the flags
+    for flag in flags:
+        flag_arg = flag.copy()
+        name = flag_arg.pop("name")
+
+        # Checks if there is an aliace
+        if isinstance(name, list):
+            parser.add_argument(*name, **flag_arg)
+        else:
+            parser.add_argument(name, **flag_arg)
+
+    # Parse flags
+    parsed_args = parser.parse_args(args)
+    return parsed_args
+
 # Porcelin commands
 import porcelin
 def prepare_init(*args: Tuple) -> SyntaxStatus:
@@ -103,6 +123,65 @@ def prepare_cat_file(*args) -> SyntaxStatus:
     print(final)
     return SyntaxStatus.SYNTAX_CORRECT
 
+def prepare_update_index(*args) -> SyntaxStatus:
+    possible_flags = [
+        {"name": "--add", "action": "store_true"},
+        {"name": "--remove", "action": "store_true"},
+        {"name": "--force-remove", "action": "store_true"},
+        {"name": "--replace", "action": "store_true"},
+        {"name": "--refresh", "action": "store_true"},
+        {"name": "-q", "action": "store_true"},
+        {"name": "--unmerged", "action": "store_true"},
+        {"name": "--ignore-missing", "action": "store_true"},
+        {"name": "--cacheinfo", "nargs": 3, "action": "append", "help": "<mode>,<object>,<file>"},
+        {"name": "--chmod", "type": str, "choices": ["+x", "-x"]},
+        {"name": "--assume-unchanged", "action": "store_true"},
+        {"name": "--no-assume-unchanged", "action": "store_true"},
+        {"name": "--skip-worktree", "action": "store_true"},
+        {"name": "--no-skip-worktree", "action": "store_true"},
+        {"name": "--ignore-skip-worktree-entries", "action": "store_true"},
+        {"name": "--no-ignore-skip-worktree-entries", "action": "store_true"},
+        {"name": "--fsmonitor-valid", "action": "store_true"},
+        {"name": "--no-fsmonitor-valid", "action": "store_true"},
+        {"name": "--ignore-submodules", "action": "store_true"},
+        {"name": "--split-index", "action": "store_true"},
+        {"name": "--no-split-index", "action": "store_true"},
+        {"name": "--untracked-cache", "action": "store_true"},
+        {"name": "--no-untracked-cache", "action": "store_true"},
+        {"name": "--test-untracked-cache", "action": "store_true"},
+        {"name": "--force-untracked-cache", "action": "store_true"},
+        {"name": "--fsmonitor", "action": "store_true"},
+        {"name": "--no-fsmonitor", "action": "store_true"},
+        {"name": "--really-refresh", "action": "store_true"},
+        {"name": "--unresolve", "action": "store_true"},
+        {"name": ["--again", "-g"], "action": "store_true"},
+        {"name": "--info-only", "action": "store_true"},
+        {"name": "--index-info", "action": "store_true"},
+        {"name": "-z", "action": "store_true"},
+        {"name": "--stdin", "action": "store_true"},
+        {"name": "--index-version", "type": int, "help": "<n>"},
+        {"name": "--show-index-version", "action": "store_true"},
+        {"name": "--verbose", "action": "store_true"},
+        {"name": "files", "nargs": "*", "help": "Files to update"}
+    ]
+
+    parsed_flags = parse_flags(name="update-index", flags=possible_flags, args=args)
+    final = plumbing.update_index(**vars(parsed_flags))
+
+    return SyntaxStatus.SYNTAX_CORRECT
+
+def prepare_write_tree(*args) -> SyntaxStatus:
+    possible_flags = [
+        {"name": "--missing-ok", "action": "store_true"},
+        {"name": "--prefix", "type": str, "help": "Writes a tree object that represents a subdirectory <prefix>. This can be used to write the tree object for a subproject that is in the named subdirectory."}
+    ]
+
+    parsed_flags = parse_flags(name="write-tree", flags=possible_flags, args=args)
+    final = plumbing.write_tree(**vars(parsed_flags))
+    print(final)
+
+    return SyntaxStatus.SYNTAX_CORRECT
+
 def main():
     if len(sys.argv) < 2:
         print("Error: missing command")
@@ -118,7 +197,9 @@ def main():
 
     plumbing_commands = {
         "hash-object": prepare_hash_object,
-        "cat-file": prepare_cat_file
+        "cat-file": prepare_cat_file,
+        "update-index": prepare_update_index,
+        "write-tree": prepare_write_tree
     }
 
     handler = porcelin_commands.get(command) or plumbing_commands.get(command)
