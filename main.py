@@ -1,24 +1,10 @@
 import sys
 import argparse
 from pathlib import Path
-from enum import Enum
 from typing import Tuple
+from config import *
 
 sys.dont_write_bytecode = True
-BASE_PATH = ".rgit"
-BRANCH_NAME = "main"
-
-class ExecuteResult(Enum):
-    EXECUTE_SUCCESS = 0
-    EXECUTE_FAIL = 1
-
-class SyntaxStatus(Enum):
-    SYNTAX_CORRECT = 0
-    SYNTAX_ERROR = 1
-
-class PrepareArgs(Enum):
-    SUCCESS = 0
-    FAIL = 1
 
 # Helper functions
 def parse_flags(name: str, flags: list, args: tuple):
@@ -182,6 +168,29 @@ def prepare_write_tree(*args) -> SyntaxStatus:
 
     return SyntaxStatus.SYNTAX_CORRECT
 
+def prepare_read_tree(*args) -> SyntaxStatus:
+    possible_flags = [
+        {"name": "-m", "action": "store_true"},
+        {"name": "--trivial", "action": "store_true"},
+        {"name": "--aggressive", "action": "store_true"},
+        {"name": "--reset", "action": "store_true"},
+        {"name": "--prefix", "type": str},
+        {"name": "-u", "action": "store_true"},
+        {"name": "-i", "action": "store_true"},
+        {"name": "--index-output", "type": str},
+        {"name": "--no-sparse-checkout", "action": "store_true"},
+        {"name": "--empty", "action": "store_true"},
+        {"name": "tree_ish", "nargs": "*", "help": "<tree-ish1> [<tree-ish2> [<tree-ish3>]]"}
+    ]
+
+    parsed_flags = parse_flags(name="read-tree", flags=possible_flags, args=args)
+    final = plumbing.read_tree(**vars(parsed_flags))
+    
+    if final:
+        print(final)
+
+    return SyntaxStatus.SYNTAX_CORRECT
+
 def main():
     if len(sys.argv) < 2:
         print("Error: missing command")
@@ -199,7 +208,8 @@ def main():
         "hash-object": prepare_hash_object,
         "cat-file": prepare_cat_file,
         "update-index": prepare_update_index,
-        "write-tree": prepare_write_tree
+        "write-tree": prepare_write_tree,
+        "read-tree": prepare_read_tree
     }
 
     handler = porcelin_commands.get(command) or plumbing_commands.get(command)

@@ -10,6 +10,7 @@ import binascii
 
 sys.dont_write_bytecode = True
 
+# Plumbing commands
 def hash_object(file: str, t: str, w: bool, stdin: bool, stdin_paths: bool, path: str, no_filters: bool, literally: bool) -> list[str]:
     if stdin:
         input_data = sys.stdin.buffer.read()
@@ -201,80 +202,91 @@ def update_index(
     verbose: bool = False,
     files: list[str] | None = None
 ) -> str:
-    # We have to check if the files are in the index, for now I will just assume that its not.
-    print(files)
-    path = f"{BASE_PATH}/index"
-    #path = Path(path)
+    if not files:
+        return "No files specified"
 
-    if cacheinfo:
-        if len(cacheinfo) != 0:
-            mode = cacheinfo[0][0].encode()
-            hash = cacheinfo[0][1].encode()
-            name = cacheinfo[0][2].encode()
+    index_path = Path(f"{BASE_PATH}/index")
+    entries = {}
 
-    else:
-        mode = oct(os.stat(files[0]).st_mode)
+    if index_path.exists():
+        data = index_path.read_bytes()
+        if len(data) > 12:
+            num_entries = struct.unpack(">I", data[8:12])[0]
+            offset = 12
+            for _ in range(num_entries):
+                path_end = data.find(b'\x00', offset + 62)
+                name_bytes = data[offset+62:path_end]
+                
+                entry_len = 62 + len(name_bytes)
+                padding = 8 - (entry_len % 8)
+                total_len = entry_len + padding
+                
+                entries[name_bytes] = data[offset:offset+total_len]
+                offset += total_len
+
+    for file_path in files:
+        target_file = Path(file_path)
+        if not target_file.exists():
+            print(f"fatal: pathspec '{file_path}' did not match any files")
+            continue
+
+        content = target_file.read_bytes()
+        header = f"blob {len(content)}\0".encode("utf-8")
+        store_data = header + content
         
-        if mode == "040000":
-            t = "tree"
-        elif mode == "160000":
-            t = "commit"
-        else:
-            t = "blob"
+        sha1 = hashlib.sha1(store_data)
+        hash_digest = sha1.digest()
+        hash_hex = sha1.hexdigest()
+        
+        blob_path = Path(f"{BASE_PATH}/objects/{hash_hex[:2]}/{hash_hex[2:]}")
+        blob_path.parent.mkdir(parents=True, exist_ok=True)
+        blob_path.write_bytes(zlib.compress(store_data))
 
-        with open(files[0], "rb") as f:
-            input_data = f.read()
-        header = f"{t} {len(input_data)}\0".encode("utf-8")
-        data = header + input_data
+        st = target_file.stat()
+        ctime_s = int(st.st_ctime) & 0xFFFFFFFF
+        ctime_ns = int(st.st_ctime_ns % 1_000_000_000) & 0xFFFFFFFF
+        mtime_s = int(st.st_mtime) & 0xFFFFFFFF
+        mtime_ns = int(st.st_mtime_ns % 1_000_000_000) & 0xFFFFFFFF
+        dev = int(st.st_dev) & 0xFFFFFFFF
+        ino = int(st.st_ino) & 0xFFFFFFFF
+        uid = int(st.st_uid) & 0xFFFFFFFF
+        gid = int(st.st_gid) & 0xFFFFFFFF
+        size = int(st.st_size) & 0xFFFFFFFF
 
-        hash = hashlib.sha1(data).hexdigest()
+        mode = 0o100755 if os.access(target_file, os.X_OK) else 0o100644
+        
+        name_bytes = str(target_file).encode("utf-8")
+        flags = len(name_bytes) & 0x0FFF
 
-        name = files[0].encode()
+        entry_meta = struct.pack(">10I20sH", 
+            ctime_s, ctime_ns, mtime_s, mtime_ns, dev, ino, mode, uid, gid, size,
+            hash_digest, flags
+        )
+        
+        entry_without_padding = entry_meta + name_bytes
+        pad_len = 8 - (len(entry_without_padding) % 8)
+        new_entry = entry_without_padding + (b"\x00" * pad_len)
+        
+        entries[name_bytes] = new_entry
 
-    if add:
-        header = struct.pack("!4sII", b"DIRC", 2, 1)
+    sorted_names = sorted(entries.keys())
+    new_header = struct.pack(">4sII", b"DIRC", 2, len(sorted_names))
+    
+    index_content = bytearray(new_header)
+    for name in sorted_names:
+        index_content.extend(entries[name])
+        
+    checksum = hashlib.sha1(index_content).digest()
+    index_path.write_bytes(index_content + checksum)
 
-        # We have to define the timestapms later.
-        ctime_s = ctime_ns = mtime_s = mtime_ns = 0
-        dev = ino = uid = gid = file_size = 0
-
-        if not isinstance(mode, int):
-            mode = int(mode, 8)
-
-        entry_meta = struct.pack("!10I", ctime_s, ctime_ns, mtime_s, mtime_ns, dev, ino, mode, uid, gid, file_size)
-
-        hash = binascii.unhexlify(hash)
-        print(hash)
-
-        name_lenght = len(name)
-        flags = struct.pack("!H", name_lenght)
-
-        entry_len = 62 + name_lenght
-        padding_len = 8 - (entry_len % 8)
-        padding = b"\x00" * padding_len
-
-        data = entry_meta + hash + flags + name + padding
-
-        index = header + data
-        checksum = hashlib.sha1(index).digest()
-
-        final = index + checksum
-
-        print(final)
-        print(type(final))
-        print(path)
-        print(type(path))
-
-        with open(path, "ab") as f:
-            f.write(final)
-
-    return "done"
+    return
 
 def write_tree(missing_ok: bool=False, prefix: str | None = None) -> str:
     if not missing_ok:
         if not Path(f"{BASE_PATH}/index").is_file():
             print("There is no index file or is corrupt.")
 
+    # This logic is wrong, what this flag does is from all the files in index it chooses one to save into .git/objects.
     if prefix == None:
         path = f"{BASE_PATH}/index"
     else:
@@ -282,46 +294,43 @@ def write_tree(missing_ok: bool=False, prefix: str | None = None) -> str:
 
     with open(path, "rb") as f:
         index_bytes = f.read()
-
-    num_entries = int.from_bytes(index_bytes[8:12], byteorder='big')
+        
+    hashed_tree = hash_tree(index_bytes)
+    return hashed_tree
+    
+def read_tree(
+    m: bool = False,
+    trivial: bool = False,
+    aggressive: bool = False,
+    reset: bool = False,
+    prefix: str | None = None,
+    u: bool = False,
+    i: bool = False,
+    index_output: str | None = None,
+    no_sparse_checkout: bool = False,
+    empty: bool = False,
+    tree_ish: list[str] | None = None
+) -> None:
+    index_path = Path(f"{BASE_PATH}/index")
+ 
+    data = index_path.read_bytes()
+    num_entries = int.from_bytes(data[8:12], "big")
     offset = 12
-    
-    tree_entries = []
-
+    entries = []
+ 
     for _ in range(num_entries):
-        metadata = index_bytes[offset : offset + 62]
-        
-        mode_int = int.from_bytes(metadata[24:28], byteorder='big')
-        mode_str = oct(mode_int)[2:] 
-        
-        raw_hash = metadata[40:60]
-        
-        path_start = offset + 62
-        path_end = path_start
-        while index_bytes[path_end] != 0x00:
-            path_end += 1
-            
-        name = index_bytes[path_start:path_end] # Keep as raw bytes
-        
-        entry_size = 62 + (path_end - path_start)
-        padding = 8 - (entry_size % 8)
-        offset += entry_size + padding
-        
-        entry = mode_str.encode('utf-8') + b' ' + name + b'\x00' + raw_hash
-        tree_entries.append((name, entry))
-
-    tree_entries.sort(key=lambda x: x[0])
-    tree_content = b"".join([entry[1] for entry in tree_entries])
-
-    header = f"tree {len(tree_content)}\0".encode('utf-8')
-    tree_object = header + tree_content
-
-    tree_hash = hashlib.sha1(tree_object).hexdigest()
-
-    file_path = Path(f"{BASE_PATH}/objects/{tree_hash[:2]}/{tree_hash[2:]}")
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    final_data = zlib.compress(tree_object)
-    file_path.write_bytes(final_data)
-
-    return tree_hash
+        mode = int.from_bytes(data[offset + 24:offset + 28], "big")
+        raw_hash = data[offset + 40:offset + 60]
+        path_end = data.find(b"\x00", offset + 62)
+        name = data[offset + 62:path_end]
+        entry_len = 62 + len(name)
+        offset += entry_len + (8 - entry_len % 8)
+        entries.append((mode, raw_hash, name))
+ 
+    if prefix:
+        p = prefix.rstrip("/").encode() + b"/"
+        entries = [(m, h, n[len(p):]) for m, h, n in entries if n.startswith(p)]
+        if not entries:
+            raise SystemExit(f"fatal: prefix {prefix} not found in index")
+ 
+    return hash_tree(entries).hex()
