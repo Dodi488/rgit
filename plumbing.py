@@ -5,7 +5,6 @@ import sys
 import hashlib
 import zlib
 import struct
-import hashlib
 import binascii
 
 sys.dont_write_bytecode = True
@@ -150,7 +149,8 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
 
     elif batch or batch_check or batch_command:
         if len(objects) > 0:
-            parser.error("Batch modes do not take positional arguments.")
+            print("Batch modes do not take positional arguments.")
+            return
 
     elif textconv or filters:
         pass

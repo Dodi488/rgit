@@ -2,13 +2,15 @@ import sys
 import argparse
 from pathlib import Path
 from typing import Tuple
+import porcelin
+import plumbing
 from config import *
 
 sys.dont_write_bytecode = True
 
 # Helper functions
 def parse_flags(name: str, flags: list, args: tuple):
-    # Defina the name.
+    # Defina the name
     parser = argparse.ArgumentParser(prog=name)
 
     # Define the flags
@@ -27,8 +29,7 @@ def parse_flags(name: str, flags: list, args: tuple):
     return parsed_args
 
 # Porcelin commands
-import porcelin
-def prepare_init(*args: Tuple) -> SyntaxStatus:
+def prepare_init(*args) -> SyntaxStatus:
     if len(args) < 1:
         print("You must select a directory when using init.")
         return SyntaxStatus.SYNTAX_ERROR
@@ -40,71 +41,45 @@ def prepare_add():
     pass
 
 # Plumbing commands
-import plumbing
-def prepare_hash_object(*args) -> tuple[SyntaxStatus, str]:
-    # Define flags for hash-object
-    parser = argparse.ArgumentParser(prog="hash-object")
-    parser.add_argument("file", type=str, nargs="?", help="The file to hash")
-    parser.add_argument("-t", type=str, default="blob", help="Choose object file type.")
-    parser.add_argument("-w", action="store_true", help="Choose if you want to store the object.")
-    parser.add_argument("--stdin", action="store_true", help="Choose if you want your input from the standard input.")
-    parser.add_argument("--stdin-paths", action="store_true", help="Read filename from standard input.")
-    parser.add_argument("--path", type=str, help="Hash object as if it were located at the given path.")
-    parser.add_argument("--no-filters", action="store_true", help="Hash the contents as is.")
-    parser.add_argument("--literally", action="store_true", help="Allow --stdin to hash any garbage.")
+def prepare_hash_object(*args) -> str:
+    possible_flags = [
+        {"name": "file", "type": str, "nargs": "?", "help": "The file to hash"},
+        {"name": "-t", "type": str, "default": "blob", "help": "Choose object file type."},
+        {"name": "-w", "action": "store_true", "help": "Choose if you want to store the object."},
+        {"name": "--stdin", "action": "store_true", "help": "Choose if you want your input from the standard input."},
+        {"name": "--stdin-paths", "action": "store_true", "help": "Read filename from standard input."},
+        {"name": "--path", "type": str, "help": "Hash object as if it were located at the given path."},
+        {"name": "--no-filters", "action": "store_true", "help": "Hash the contents as is."},
+        {"name": "--literally", "action": "store_true", "help": "Allow --stdin to hash any garbage."}
+    ]
 
-    parsed_args = parser.parse_args(args)
+    parsed_args = parse_flags(name="hash-object", flags=possible_flags, args=args)
     
     final = plumbing.hash_object(**vars(parsed_args))
     return SyntaxStatus.SYNTAX_CORRECT, final
 
 def prepare_cat_file(*args) -> SyntaxStatus:
-    # Define flags
-    parser = argparse.ArgumentParser(prog="cat_file")
+    possible_flags = [
+        {"name": "-e", "action": "store_true", "help": "Exit with zero status if <object> is valid, if its not exit with non zero status."},
+        {"name": "-p", "action": "store_true", "help": "Prety-print the contents of <object> based in its type."},
+        {"name": "-t", "action": "store_true", "help": "Show <object> file."},
+        {"name": "-s", "action": "store_true", "help": "Show the size of <object>. If used with --use-mailmap it will show the size of updated object after being replace with idents using the mailmap mechanism."},
+        {"name": "--textconv", "action": "store_true", "help": "Show the content as transformed by a textconv filter."},
+        {"name": "--filters", "action": "store_true", "help": "Show the content as converted by the filters configured in the current working tree for the given <path>."},
+        {"name": "--batch", "action": "store_true", "help": "Print object information and contents for each object in stdin."},
+        {"name": "--batch-check", "action": "store_true", "help": ""},
+        {"name": "--batch-command", "action": "store_true", "help": ""},
+        {"name": "--batch-all-objects", "action": "store_true", "help": ""},
+        {"name": "--buffer", "action": "store_true", "help": ""},
+        {"name": "--follow-symlinks", "action": "store_true", "help": ""},
+        {"name": "--unordered", "action": "store_true", "help": ""},
+        {"name": "-Z", "action": "store_true", "help": ""},
+        {"name": "objects", "nargs": "*", "help": "<type> <object> OR <object> depending on flags"}
+    ]
 
-    parser.add_mutually_exclusive_group()
-
-    parser.add_argument("-e", action="store_true", help="Exit with zero status if <object> is valid, if its not exit with non zero status.")
-    parser.add_argument("-p", action="store_true", help="Prety-print the contents of <object> based in its type.")
-    parser.add_argument("-t", action="store_true", help="Show <object> file.")
-    parser.add_argument("-s", action="store_true", help="Show the size of <object>. If used with --use-mailmap it will show the size of updated object after being replace with idents using the mailmap mechanism.")
-
-    parser.add_argument("--textconv", action="store_true", help="Show the content as transformed by a textconv filter.")
-    parser.add_argument("--filters", action="store_true", help="Show the content as converted by the filters configured in the current working tree for the given <path>.")
-
-    parser.add_argument("--batch", action="store_true", help="Print object information and contents for each object in stdin.")
-    parser.add_argument("--batch-check", action="store_true", help="")
-    parser.add_argument("--batch-command", action="store_true", help="")
-    parser.add_argument("--batch-all-objects", action="store_true", help="")
-
-    parser.add_argument("--buffer", action="store_true", help="")
-    parser.add_argument("--follow-symlinks", action="store_true", help="")
-    parser.add_argument("--unordered", action="store_true", help="")
-    parser.add_argument("-Z", action="store_true", help="")
-
-    parser.add_argument("objects", nargs="*", help="<type> <object> OR <object> depending on flags")
-
-    parsed_args = parser.parse_args(args)
-    #args = parser.parse_args()
+    parsed_args = parse_flags(name="cat_file", flags=possible_flags, args=args)
 
     final = plumbing.cat_file(**vars(parsed_args))
-
-    #final = plumbing.cat_file(
-    #    e=args.e,
-    #    p=args.p,
-    #    t=args.t,
-    #    s=args.s,
-    #    textconv=args.textconv,
-    #    filters=args.filters,
-    #    batch=args.batch,
-    #    batch_check=args.batch_check,
-    #    batch_command=args.batch_command,
-    #    batch_all_objects=args.batch_all_objects,
-    #    buffer=args.buffer,
-    #    follow_symlinks=args.follow_symlinks,
-    #    Z=args.Z,
-    #    objects=args.objects
-    #)
 
     print(final)
     return SyntaxStatus.SYNTAX_CORRECT
