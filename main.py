@@ -41,7 +41,7 @@ def prepare_add():
     pass
 
 # Plumbing commands
-def prepare_hash_object(*args) -> str:
+def prepare_hash_object(*args) -> tuple[SyntaxStatus, str]:
     possible_flags = [
         {"name": "file", "type": str, "nargs": "?", "help": "The file to hash"},
         {"name": "-t", "type": str, "default": "blob", "help": "Choose object file type."},

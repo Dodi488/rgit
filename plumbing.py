@@ -1,4 +1,5 @@
-from main import ExecuteResult, BASE_PATH, BRANCH_NAME
+from config import ExecuteResult, BASE_PATH, BRANCH_NAME
+from plumbling_helpers import hash_tree
 from pathlib import Path
 import os
 import sys
@@ -43,7 +44,7 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
 
         hash = objects[0]
         
-        def check_object_type(hash: str) -> tuple(str, str):
+        def check_object_type(hash: str) -> tuple[str, str]:
             with open(f"{BASE_PATH}/objects/{hash[:2]}/{hash[2:]}", "rb") as f:
                 file = f.read()
 
@@ -124,7 +125,7 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
             file_type, content = check_object_type(hash)
 
             if file_type[0:4] == "blob":
-                file_content = is_blob(content)[1].replace("\n", "")
+                file_content = is_blob(content)[1]#.replace("\n", "")
             elif file_type[0:4] == "tree":
                 #content = content.replace(b"\x00", b" 0").split(b" ")
                 #content = content[2:-1].split(b" ")[1:]
@@ -157,7 +158,7 @@ def cat_file(e: bool, p: bool, t: bool, s: bool, textconv: bool, filters: bool, 
 
     else:
         if len(objects) != 2:
-            parser.error("Requires exactly 2 arguments <type> <object>.")
+            print("Requires exactly 2 arguments <type> <object>.")
         obj_type, target_object = objects
 
     return

@@ -1,11 +1,10 @@
-from main import ExecuteResult, BASE_PATH, BRANCH_NAME
+from config import ExecuteResult, BASE_PATH, BRANCH_NAME
 from pathlib import Path
 import os
 import sys
 import hashlib
 import zlib
 import struct
-import hashlib
 
 sys.dont_write_bytecode = True
 
@@ -35,8 +34,8 @@ def unhash_tree(bytes: bytes) -> str:
         lines.append(f"{type} {t} {hash.hex()}    {name}")
 
         content = content[nullo + 21:]
-    
-        return "\n".join(lines)
+
+    return "\n".join(lines)
 
 def hash_tree(index_bytes: bytes) -> str:
     num_entries = int.from_bytes(index_bytes[8:12], byteorder='big')
@@ -83,7 +82,7 @@ def hash_tree(index_bytes: bytes) -> str:
     return tree_hash
     
 def read_hash(hash: str) -> bytes:
-    if Path(f"{BASE_PATH}/objects/{hash[:2]}/{hash[2:]}").exist():
+    if Path(f"{BASE_PATH}/objects/{hash[:2]}/{hash[2:]}").exists():
         with open(f"{BASE_PATH}/objects/{hash[:2]}/{hash[2:]}", "rb") as f:
             file = f.read()
         return file

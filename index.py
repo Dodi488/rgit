@@ -1,5 +1,8 @@
 import struct
 from dataclasses import dataclass
+from pathlib import Path
+import hashlib
+from config import BASE_PATH
 
 @dataclass
 class IndexEntry:
